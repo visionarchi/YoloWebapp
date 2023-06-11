@@ -82,11 +82,7 @@ class ResNet(nn.Module):
 
 
 class givemodel():
-    def __init__(self , train_path ,test_path, learning_rate, num_epochs):
-        self.train_path = train_path
-        self.test_path = test_path
-        self.learning_rate = learning_rate
-        self.num_epochs = num_epochs
+    def __init__(self):
         self.transforms = transforms.Compose([
                         transforms.Resize((224,224)),
                         transforms.RandomHorizontalFlip(),
@@ -96,34 +92,41 @@ class givemodel():
                     ])
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        train_loader = DataLoader(
+
+
+
+        self.train_loss= []
+        self.accuracy= []
+
+    def give_result(self, train_path ,test_path, learning_rate, num_epochs):
+
+        self.train_path = train_path
+        self.test_path = test_path
+        self.learning_rate = learning_rate
+        self.num_epochs = num_epochs
+
+        self.train_loader = DataLoader(
             torchvision.datasets.ImageFolder(train_path, transform=self.transforms),
             batch_size=64, shuffle=True
         )
-        test_loader = DataLoader(
+        self.test_loader = DataLoader(
             torchvision.datasets.ImageFolder(test_path, transform=self.transforms),
             batch_size=32, shuffle=True)
 
         self.model = ResNet(ResidualBlock, [3, 4, 6, 3]).to(self.device)
         self.optimizer = Adam(self.model.parameters(), lr=self.learning_rate, weight_decay=0.0001)
         self.loss_function = nn.CrossEntropyLoss()
-        self.num_epochs = 20
-
+        best_accuracy = 0.0
         train_count = len(glob.glob(self.train_path + '/**/*.png'))
         test_count = len(glob.glob(self.test_path + '/**/*.png'))
-
         print(train_count, test_count)
-
-        best_accuracy = 0.0
-
-        for epoch in range(num_epochs):
-
+        for epoch in range(self.num_epochs):
             # Evaluation and training on training dataset
             self.model.train()
             train_accuracy = 0.0
             train_loss = 0.0
 
-            for i, (images, labels) in enumerate(train_loader):
+            for i, (images, labels) in enumerate(self.train_loader):
                 if torch.cuda.is_available():
                     images = Variable(images.cuda())
                     labels = Variable(labels.cuda())
@@ -147,7 +150,7 @@ class givemodel():
             self.model.eval()
 
             test_accuracy = 0.0
-            for i, (images, labels) in enumerate(test_loader):
+            for i, (images, labels) in enumerate(self.test_loader):
                 if torch.cuda.is_available():
                     images = Variable(images.cuda())
                     labels = Variable(labels.cuda())
@@ -157,14 +160,20 @@ class givemodel():
                 test_accuracy += int(torch.sum(prediction == labels.data))
 
             test_accuracy = test_accuracy / test_count
+            self.accuracy.append(train_accuracy)
+            self.train_loss.append(train_loss)
+
 
             print('Epoch: ' + str(epoch) + ' Train Loss: ' + str(train_loss) + ' Train Accuracy: ' + str(
                 train_accuracy) + ' Test Accuracy: ' + str(test_accuracy))
+
 
             # Save the best model
             if test_accuracy > best_accuracy:
                 torch.save(self.model.state_dict(), 'best_checkpoint1.model')
                 best_accuracy = test_accuracy
+
+            return self.accuracy, self.train_loss
 
     def save_onnx_model(self, name_of_model):
 
@@ -183,7 +192,9 @@ class givemodel():
 if __name__ == '__main__':
     train_path=r"C:\Users\rohin\Desktop\torch\dataset\weld_train"
     test_path=r"C:\Users\rohin\Desktop\torch\dataset\weld_test"
-    obj = givemodel(train_path,test_path,0.001,10)
+    obj = givemodel()
+    obj.give_result(train_path,test_path,0.001,1)
+    print(obj.accuracy)
     obj.save_onnx_model("restest.onnx")
 
 
