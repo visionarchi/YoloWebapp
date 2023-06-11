@@ -2,11 +2,12 @@ import numpy as np
 from flask import Flask, render_template,Response,request
 import cv2
 import torch
+import resnet_training
 
 app = Flask(__name__)
 camera = cv2.VideoCapture(0)
 streaming = True
-
+obj= resnet_training
 
 @app.route("/")
 def home():
@@ -63,6 +64,24 @@ def video():
 @app.route('/video_infer')
 def video_infer():
     return Response(generate_yolo_frames(),mimetype='multipart/x-mixed-replace; boundary=frame')
+
+@app.route("/imageclass")
+def auto_dl():
+    return render_template("IC.html")
+
+@app.route("/training", methods= ['GET','POST'])
+def train_dl():
+    if request.method == 'POST':
+        train_path = request.form['trainpath']
+        test_path = request.form['testpath']
+        epochs = request.form['epochs']
+        lr = request.form['lr']
+        print(train_path,test_path,epochs,lr)
+        accuracy, train_loss = obj.givemodel().give_result(train_path, test_path,float(lr),int(epochs))
+        return render_template("af_train.html" , accuracy= accuracy, train_loss=train_loss)
+
+
+
 
 
 if __name__ == '__main__':
